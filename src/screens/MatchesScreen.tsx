@@ -1,19 +1,23 @@
 import CardMatch from '../components/CardMatch';
+import MatchFilters, { MatchFilter } from '../components/MatchFilters';
+import { UpdatedAgo } from '../components/UpdatedAgo';
 
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useEffect, useState } from 'react';
-
-import type { Match } from '../types/types';
 import { fetchMatches } from '../utils/fetchMatches';
 import { MATCHES_URL } from '../config';
-// Экран «Матчи тура» — задание в README.md, часть 1.
-type Filter = 'all' | 'upcoming' | 'finished';
+
+import type { Match } from '../types/types';
+import { useFavorites } from '../hooks/useFavorites';
 
 export function MatchesScreen() {
   const [matches, setMatches] = useState<Match[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [filter, setFilter] = useState<Filter>('all');
+  const [filter, setFilter] = useState<MatchFilter>('all');
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  const { isFavorite, toggle } = useFavorites();
 
   const filteredMatches = matches?.filter((match) => {
     if (filter === 'finished') {
@@ -38,6 +42,7 @@ export function MatchesScreen() {
     try {
       const data = await fetchMatches(MATCHES_URL);
       setMatches(data.matches);
+      setLastUpdated(new Date());
     } catch {
       setError(true);
     } finally {
@@ -49,12 +54,12 @@ export function MatchesScreen() {
     loadMatches();
   }, []);
 
-  if (loading) return (
+  if (loading && matches === null) return (
     <View style={styles.loaderContainer}>
       <ActivityIndicator size="large" color="#2563EB" />
     </View>
   )
-  if (error) return (
+  if (error && matches === null) return (
     <View style={styles.errorContainer}>
       <Text style={styles.errorText}>
         Не удалось загрузить матчи
@@ -70,39 +75,37 @@ export function MatchesScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>Матчи тура</Text>
 
-      <View style={styles.filters}>
-        <Pressable
-          style={[styles.filterButton, filter === 'all' && styles.activeFilter]}
-          onPress={() => setFilter('all')}
-        >
-          <Text style={[styles.filterText, filter === 'all' && styles.activeFilterText]}>
-            Все
-          </Text>
-        </Pressable>
+      <View style={styles.updateRow}>
+        {lastUpdated && <UpdatedAgo since={lastUpdated} />}
 
         <Pressable
-          style={[styles.filterButton, filter === 'upcoming' && styles.activeFilter]}
-          onPress={() => setFilter('upcoming')}
+          style={styles.refreshButton}
+          onPress={loadMatches}
+          disabled={loading}
         >
-          <Text style={[styles.filterText, filter === 'upcoming' && styles.activeFilterText]}>
-            Предстоящие
-          </Text>
-        </Pressable>
-
-        <Pressable
-          style={[styles.filterButton, filter === 'finished' && styles.activeFilter]}
-          onPress={() => setFilter('finished')}
-        >
-          <Text style={[styles.filterText, filter === 'finished' && styles.activeFilterText]}>
-            Завершённые
+          <Text style={styles.refreshButtonText}>
+            {loading ? 'Обновление...' : 'Обновить'}
           </Text>
         </Pressable>
       </View>
 
+      <MatchFilters filter={filter} onChange={setFilter} />
+
       <FlatList
         data={filteredMatches}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <CardMatch item={item} />}
+        renderItem={({ item }) => (
+          <CardMatch
+            item={item}
+            isFavorite={isFavorite}
+            onToggleFavorite={toggle}
+          />
+        )}
+        ListEmptyComponent={
+          <Text style={styles.emptyText}>Матчей нет</Text>
+        }
+        refreshing={loading}
+        onRefresh={loadMatches}
       />
     </View>
   );
@@ -150,32 +153,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  filters: {
+  updateRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 20,
-  },
-
-  filterButton: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 6,
-    borderRadius: 8,
-    backgroundColor: '#F1F5F9',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+    gap: 12,
   },
-
-  activeFilter: {
+  refreshButton: {
     backgroundColor: '#2563EB',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 8,
   },
-
-  filterText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#475569',
-  },
-
-  activeFilterText: {
+  refreshButtonText: {
     color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: '#6b7280',
+    paddingVertical: 24,
   },
 });

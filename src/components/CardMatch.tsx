@@ -1,9 +1,12 @@
 
 import { StyleSheet, Text, View } from 'react-native';
 import type { Match } from '../types/types';
+import { FavoriteButton } from './FavoriteButton';
 
 interface CardMatchProps {
     item: Match;
+    isFavorite: (id: string) => boolean;
+    onToggleFavorite: (id: string) => void;
 }
 
 const statusLabels: Record<Match['status'], string> = {
@@ -13,7 +16,11 @@ const statusLabels: Record<Match['status'], string> = {
     postponed: 'Перенесён',
 };
 
-export default function CardMatch({ item }: CardMatchProps) {
+export default function CardMatch({
+    item,
+    isFavorite,
+    onToggleFavorite,
+}: CardMatchProps) {
     const date = item.startsAt
         ? new Date(item.startsAt).toLocaleString('ru-RU', {
             day: 'numeric',
@@ -22,6 +29,8 @@ export default function CardMatch({ item }: CardMatchProps) {
             minute: '2-digit',
         })
         : null;
+
+    const active = isFavorite(item.id);
 
     return (
         <View style={styles.card}>
@@ -44,7 +53,10 @@ export default function CardMatch({ item }: CardMatchProps) {
                     </Text>
                 )}
             </View>
-
+            <FavoriteButton
+                active={active}
+                onPress={() => onToggleFavorite(item.id)}
+            />
             <View style={styles.footer}>
                 <Text style={styles.date}>
                     {date ?? 'Дата и время не указаны'}
